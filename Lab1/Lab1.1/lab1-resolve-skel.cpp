@@ -9,13 +9,20 @@
  */
 /******************************************************************* -}}}1- */
 
+#include <cstddef>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stddef.h>
 
 #include <assert.h>
 #include <limits.h>
 #include <unistd.h>
-
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 //--//////////////////////////////////////////////////////////////////////////
 //--    local declarations          ///{{{1///////////////////////////////////
 
@@ -39,7 +46,7 @@ void print_usage( const char* aProgramName );
 //--    main()                      ///{{{1///////////////////////////////////
 int main( int aArgc, char* aArgv[] )
 {
-	// Check if the user supplied a command line argument.
+	// Check$ if the user supplied a command line argument.
 	if( aArgc != 2 )
 	{
 		print_usage( aArgv[0] );
@@ -64,8 +71,14 @@ int main( int aArgc, char* aArgv[] )
 	printf( "Resolving `%s' from `%s':\n", remoteHostName, localHostName );
 
 	// TODO : add your code here
-	addrinfo* addrinfo = getaddrinfo();
-	printf(addrinfo);
+	// Create a hints struct to pass to getaddrinfo()
+	struct addrinfo hints;
+	struct addrinfo *results;
+	hints.ai_family	= AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	int addr_status = getaddrinfo(remoteHostName, NULL, );
+	printf("Addrinfo: %d", hints.ai_family);
 	// getaddrinfo() allocates a addrinfo struct which needs to be freed	
 	freeaddrinfo();
 	// Ok, we're done. Return success.
