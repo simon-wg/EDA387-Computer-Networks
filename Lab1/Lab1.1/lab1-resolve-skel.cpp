@@ -64,7 +64,10 @@ int main( int aArgc, char* aArgv[] )
 	printf( "Resolving `%s' from `%s':\n", remoteHostName, localHostName );
 
 	// TODO : add your code here
-
+	addrinfo* addrinfo = getaddrinfo();
+	printf(addrinfo);
+	// getaddrinfo() allocates a addrinfo struct which needs to be freed	
+	freeaddrinfo();
 	// Ok, we're done. Return success.
 	return 0;
 }
