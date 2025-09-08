@@ -77,7 +77,12 @@ int main( int aArgc, char* aArgv[] )
 	hints.ai_family	= AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
-	int addr_status = getaddrinfo(remoteHostName, NULL, );
+	hints.ai_flags = 0;
+	hints.ai_addr = NULL;
+	hints.ai_addrlen = 0;
+	hints.ai_canonname = NULL;
+	hints.ai_next = NULL;
+	int addr_status = getaddrinfo(remoteHostName, NULL, hints, &results);
 	printf("Addrinfo: %d", hints.ai_family);
 	// getaddrinfo() allocates a addrinfo struct which needs to be freed	
 	freeaddrinfo();
