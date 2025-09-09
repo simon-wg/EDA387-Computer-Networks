@@ -9,9 +9,12 @@
  */
 /******************************************************************* -}}}1- */
 
+#include <cerrno>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <err.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -48,8 +51,8 @@ void print_usage(const char *aProgramName);
 int main(int aArgc, char *aArgv[]) {
     // Check$ if the user supplied a command line argument.
     if (aArgc != 2) {
-        print_usage(aArgv[0]);
-        return 1;
+	print_usage(aArgv[0]);
+	return 1;
     }
 
     // The (only) argument is the remote host that we should resolve.
@@ -60,8 +63,14 @@ int main(int aArgc, char *aArgv[]) {
     const size_t kHostNameMaxLength = HOST_NAME_MAX + 1;
     char localHostName[kHostNameMaxLength];
 
-    if (-1 == gethostname(localHostName, kHostNameMaxLength))
-        err(EXIT_FAILURE, "gethostname");
+    if (-1 == gethostname(localHostName, kHostNameMaxLength)) {
+	switch (errno) {
+	case EFAULT:
+	    err(EXIT_FAILURE, "gethostname: invalid address");
+	case ENAMETOOLONG:
+	    err(EXIT_FAILURE, "gethostname: hostname too long");
+	}
+    }
 
     // Print the initial message
     printf("Resolving `%s' from `%s':\n", remoteHostName, localHostName);
@@ -71,7 +80,7 @@ int main(int aArgc, char *aArgv[]) {
     struct addrinfo hints;
     struct addrinfo *results;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = 0;
@@ -81,19 +90,33 @@ int main(int aArgc, char *aArgv[]) {
     hints.ai_next = NULL;
     int addr_status = getaddrinfo(remoteHostName, NULL, &hints, &results);
     if (0 != addr_status) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(addr_status));
-        exit(EXIT_FAILURE);
+	fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(addr_status));
+	exit(EXIT_FAILURE);
     };
 
-    sockaddr *sockAddr = results->ai_addr;
-    assert(sockAddr->sa_family == hints.ai_family);
-    sockaddr_in *inAddr = (sockaddr_in *)sockAddr;
-
-    uint32_t ipNumber = inAddr->sin_addr.s_addr;
-    char ipv4addr[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &ipNumber, ipv4addr, INET_ADDRSTRLEN);
-
-    printf("%s has address %s\n", remoteHostName, ipv4addr);
+    int loops = 0;
+    while (results != NULL) {
+	if (loops++ > 100)
+	    break;
+	sockaddr *sock = results->ai_addr;
+	switch (sock->sa_family) {
+	case AF_INET: {
+	    sockaddr_in *inAddr = (sockaddr_in *)sock;
+	    char ipv4addr[INET_ADDRSTRLEN];
+	    inet_ntop(AF_INET, &inAddr->sin_addr.s_addr, ipv4addr, INET_ADDRSTRLEN);
+	    printf("IPv4 %s\n", ipv4addr);
+	    break;
+	}
+	case AF_INET6: {
+	    sockaddr_in6 *inAddr = (sockaddr_in6 *)sock;
+	    char ipv6addr[INET6_ADDRSTRLEN];
+	    inet_ntop(AF_INET6, &inAddr->sin6_addr.s6_addr, ipv6addr, INET6_ADDRSTRLEN);
+	    printf("IPv6 %s\n", ipv6addr);
+	    break;
+	}
+	}
+	results = results->ai_next;
+    };
     // getaddrinfo() allocates a addrinfo struct which needs to be freed
     freeaddrinfo(results);
     // Ok, we're done. Return success.
@@ -105,4 +128,5 @@ void print_usage(const char *aProgramName) {
     fprintf(stderr, "Usage: %s <hostname>\n", aProgramName);
 }
 
-//--///}}}1/////////////// vim:syntax=cpp:foldmethod=marker:ts=4:noexpandtab:
+//--///}}}1///////////////
+// vim:syntax=cpp:foldmethod=marker:ts=4:noexpandtab:
