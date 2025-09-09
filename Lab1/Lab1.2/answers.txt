@@ -5,5 +5,39 @@ I.a.2
 a) -1: An error has occurred and the errno is set accordingly.
 b) 0: Either the stream socket peer has sent a "EOF" to indicate end of communication, or a zero-size datagram has been received, or 0 bytes was requested from a stream socket. Can often be handled as an ordinary shutdown like in the iterative server.
 c) 0 < ret < kTransferBufferSize: ret bytes were successfully received.
-d) ret = kTransferBufferSize: 
+d) ret = kTransferBufferSize: either the full message is received, or the message is truncated. Either way a null terminator is added, and we attempt to read more. If the message was truncated we can read more, otherwise we get a 0, which causes us to stop reading.
+
+I.a.3
+On an error -1 is returned.
+errno is set to ECONNRESET on connection reset.
+MSG_NOSIGNAL suppresses the SIGPIPE signal. It still gets the EPIPE.
+
+I.a.4
+The reason for the server exiting on setup failure is probably due to it being unrecoverable due to no external interactions.
+The reason for handling errors in the interaction loop more graciously could be that a single client error doesn't mean that all clients will fail.
+EBADF is a setup error, with the fd not being open for reading/writing. This is unrecoverable so the server should crash.
+EFAULT is unrecoverable as well, occurring if the accept is unable to write the incoming client to a variable.
+EINVAL is unrecoverable, and occurrs if the socket has been invalidly setup.
+ENFILE should crash, it seems pretty bad if all possible fds are open.
+ENOTSOCK happens due to bad setup, and should crash.
+EOPNOTSUPP see above.
+
+I.b.1
+When client_process_send or client_process_recv returns a non zero value.
+
+I.c.1
+When attempting to connect a second client the state for it is ESTABLISHED -.
+We do not receive a response for it.
+This is probably due to the server being busy waiting in the while ( processFurther ) loop.
+
+I.c.2
+When closing the connection to the first client the second one connects, and is successfully able to send and receive from the server.
+
+I.c.3
+Roundtrip time between machines was approx. 150ms.
+Local it was around 2 ms.
+
+I.c.4
+The largest factor is waiting for the server to respond.
+
 
