@@ -1,0 +1,9 @@
+I.a.1
+INADDR_ANY, 0.0.0.0/0x00000000
+
+I.a.2
+a) -1: An error has occurred and the errno is set accordingly.
+b) 0: Either the stream socket peer has sent a "EOF" to indicate end of communication, or a zero-size datagram has been received, or 0 bytes was requested from a stream socket. Can often be handled as an ordinary shutdown like in the iterative server.
+c) 0 < ret < kTransferBufferSize: ret bytes were successfully received.
+d) ret = kTransferBufferSize: 
+
