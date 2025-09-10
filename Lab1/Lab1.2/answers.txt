@@ -40,4 +40,64 @@ Local it was around 2 ms.
 I.c.4
 The largest factor is waiting for the server to respond.
 
+I.d.1
+Simulating 7 clients.
+Establishing 7 connections... 
+  successfully initiated 7 connection attempts!
+Connect timing results for 7 successful connections
+  - min time: 0.103967 ms
+  - max time: 0.334591 ms
+  - average time: 0.188465 ms
+ (0 connections failed!)
+Roundtrip timing results for 7 connections for 255 round trips
+  - min time: 3.296099 ms
+  - max time: 18.857672 ms
+  - average time: 11.351803 ms
 
+I.d.2
+Simulating 10 clients.
+Establishing 10 connections... 
+  successfully initiated 10 connection attempts!
+Connect timing results for 10 successful connections
+  - min time: 0.169425 ms
+  - max time: 0.375423 ms
+  - average time: 0.246337 ms
+ (0 connections failed!)
+Roundtrip timing results for 10 connections for 255 round trips
+  - min time: 6.761958 ms
+  - max time: 29.259665 ms
+  - average time: 18.192359 ms
+
+Simulating 15 clients.
+Establishing 15 connections... 
+  successfully initiated 15 connection attempts!
+Connect timing results for 15 successful connections
+  - min time: 0.080530 ms
+  - max time: 1034.695841 ms
+  - average time: 344.964083 ms
+ (0 connections failed!)
+Roundtrip timing results for 15 connections for 255 round trips
+  - min time: 4.499703 ms
+  - max time: 31.020208 ms
+  - average time: 17.668350 ms
+
+We see a massive increase in max time when stepping to 15 clients.
+50 clients has the same min and max (approx) as 15.
+100 is the same. However we see the average times increasing for each additional client.
+
+When increasing queries and keeping only 7 clients, we get no change in min-max connection times, but roundtrip increases.
+100 clients/10000 queries: 61 failed roundtrips.
+Connect timing results for 100 successful connections
+  - min time: 1.105292 ms
+  - max time: 2086.737122 ms
+  - average time: 1877.856270 ms
+ (0 connections failed!)
+Roundtrip timing results for 39 connections for 100000 round trips
+  - min time: 1410.673134 ms
+  - max time: 65967.104831 ms
+  - average time: 30327.060794 ms
+It seems like the first ~24 connections succeed, and the server is too busy dealing with them to take the next ~60 connections.
+After the initial connections succeed it seems to start taking new connections, and is able to deal with the last ~15 connections.
+
+I.d.3
+It took around 2 minutes.
