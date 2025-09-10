@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 	tv.tv_sec = 5;
 	tv.tv_usec = 0;
 
-	int ret = select(maxfd, &readfds, NULL, NULL, &tv);
+	int ret = select(maxfd + 1, &readfds, NULL, NULL, &tv);
 
 	if (-1 == ret) {
 	    perror("select() failed");
