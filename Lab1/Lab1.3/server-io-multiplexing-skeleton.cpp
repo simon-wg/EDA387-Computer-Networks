@@ -11,7 +11,7 @@
 /******************************************************************* -}}}1- */
 
 #include <assert.h>
-#include <bits/types/struct_timeval.h>
+#include <cerrno>
 #include <cstddef>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,13 +74,13 @@ enum EConnState { eConnStateReceiving, eConnStateSending };
  * need an instance for each active connection.
  */
 struct ConnectionData {
-    EConnState state; // state of the connection; see EConnState enum
+  EConnState state; // state of the connection; see EConnState enum
 
-    int sock; // file descriptor of the connections socket.
+  int sock; // file descriptor of the connections socket.
 
-    // items related to buffering.
-    size_t bufferOffset, bufferSize;
-    char buffer[kTransferBufferSize + 1];
+  // items related to buffering.
+  size_t bufferOffset, bufferSize;
+  char buffer[kTransferBufferSize + 1];
 };
 
 //--    prototypes          ///{{{1///////////////////////////////////////////
@@ -133,301 +133,304 @@ static int setup_server_socket(short port);
 
 //--    main()              ///{{{1///////////////////////////////////////////
 int main(int argc, char *argv[]) {
-    int serverPort = kServerPort;
+  int serverPort = kServerPort;
 
-    // did the user specify a port?
-    if (2 == argc) {
-	serverPort = atoi(argv[1]);
-    }
+  // did the user specify a port?
+  if (2 == argc) {
+    serverPort = atoi(argv[1]);
+  }
 
 #if VERBOSE
-    printf("Attempting to bind to port %d\n", serverPort);
+  printf("Attempting to bind to port %d\n", serverPort);
 #endif
 
-    // set up listening socket - see setup_server_socket() for details.
-    int listenfd = setup_server_socket(serverPort);
+  // set up listening socket - see setup_server_socket() for details.
+  int listenfd = setup_server_socket(serverPort);
 
-    if (-1 == listenfd)
-	return 1;
+  if (-1 == listenfd)
+    return 1;
 
-    // TODO: declare a data structure that will keep track of one ConnectionData
-    // struct for each open connection. E.g. you can use a vector (see Appendix
-    // E on the lab manual).
-    std::vector<ConnectionData> connections;
+  // TODO: declare a data structure that will keep track of one ConnectionData
+  // struct for each open connection. E.g. you can use a vector (see Appendix E
+  // on the lab manual).
+  std::vector<ConnectionData> connections;
 
-    // loop forever
-    while (1) {
+  // loop forever
+  while (1) {
 
-	fd_set readfds, writefds;
+    fd_set readfds, writefds;
 
-	FD_ZERO(&readfds);
-	FD_ZERO(&writefds);
+    FD_ZERO(&readfds);
+    FD_ZERO(&writefds);
 
-	// TODO: add listenfd to readfds.
-	// NOTE: check for FD_SET() in the man page of select().
-	FD_SET(listenfd, &readfds);
+    // TODO: add listenfd to readfds.
+    // NOTE: check for FD_SET() in the man page of select().
+    FD_SET(listenfd, &readfds);
 
-	// TODO: loop through all open connections (which you have stored in
-	// data structre, e.g. a vector) and add them in readfds or writefds.
-	// NOTE: How to know if a socket should be added in readfds or writefds?
-	// Check the "state" field of ConnectionData for that socket.
-	int maxfd = 0;
-	for (size_t i = 0; i < connections.size(); ++i) {
-	    ConnectionData conn = connections[i];
-	    maxfd = std::max(conn.sock, maxfd);
-	    switch (conn.state) {
-	    case eConnStateReceiving:
-		FD_SET(conn.sock, &readfds);
-	    case eConnStateSending:
-		FD_SET(conn.sock, &writefds);
-	    };
-	};
+    int maxfd = listenfd;
 
-	// wait for an event using select()
-	// NOTE 1: we only need one call to select() throughout our program.
-	// NOTE 2: pay attention to the first arguement of select. It should
-	// be the maximum VALUE of all tracked file descriptors + 1.
-	struct timeval tv;
-	tv.tv_sec = 5;
-	tv.tv_usec = 0;
+    // TODO: loop through all open connections (which you have stored in data
+    // structre, e.g. a vector) and add them in readfds or writefds. NOTE: How
+    // to know if a socket should be added in readfds or writefds? Check the
+    // "state" field of ConnectionData for that socket.
+    for (size_t i = 0; i < connections.size(); ++i) {
+      ConnectionData *conn = &connections[i];
+      if (is_invalid_connection(*conn))
+        break;
+      switch (conn->state) {
+      case eConnStateReceiving:
+        FD_SET(conn->sock, &readfds);
+        break;
+      case eConnStateSending:
+        FD_SET(conn->sock, &writefds);
+        break;
+      default:
+        break;
+      }
+	  if (conn->sock > maxfd)
+		maxfd = conn->sock;
+    }
 
-	int ret = select(maxfd + 1, &readfds, NULL, NULL, &tv);
+    // wait for an event using select()
+    // NOTE 1: we only need one call to select() throughout our program.
+    // NOTE 2: pay attention to the first arguement of select. It should be the
+    // maximum VALUE of all tracked file descriptors + 1.
+    int ret = select(maxfd + 1, &readfds, &writefds, 0, 0);
 
-	if (-1 == ret) {
-	    perror("select() failed");
-	    return -1;
-	}
+    if (-1 == ret) {
+      perror("select() failed");
+      return 1;
+    }
 
-	// NOTE: if listenfd is in the readfds set after the return of
-	// select(), it means we have a new incomming connection, which we
-	// need to serve, just as we did in Lab 1.2.
-	if (FD_ISSET(listenfd, &readfds)) {
-	    sockaddr_in clientAddr;
-	    socklen_t addrSize = sizeof(clientAddr);
+    // NOTE: if listenfd is in the readfds set after the return of select(),
+    // it means we have a new incomming connection, which we need to serve, just
+    // as we did in Lab 1.2.
+    if (FD_ISSET(listenfd, &readfds)) {
+      sockaddr_in clientAddr;
+      socklen_t addrSize = sizeof(clientAddr);
 
-	    // accept a single incoming connection
-	    int clientfd = accept(listenfd, (sockaddr *)&clientAddr, &addrSize);
+      // accept a single incoming connection
+      int clientfd = accept(listenfd, (sockaddr *)&clientAddr, &addrSize);
 
-	    if (-1 == clientfd) {
-		perror("accept() failed");
-		continue; // attempt to accept a different client.
-	    }
+      if (-1 == clientfd) {
+        perror("accept() failed");
+        continue; // attempt to accept a different client.
+      }
 
 #if VERBOSE
-	    // print some information about the new client
-	    char buff[128];
-	    printf("Connection from %s:%d -> socket %d\n",
-		   inet_ntop(AF_INET, &clientAddr.sin_addr, buff, sizeof(buff)),
-		   ntohs(clientAddr.sin_port), clientfd);
-	    fflush(stdout);
+      // print some information about the new client
+      char buff[128];
+      printf("Connection from %s:%d -> socket %d\n",
+             inet_ntop(AF_INET, &clientAddr.sin_addr, buff, sizeof(buff)),
+             ntohs(clientAddr.sin_port), clientfd);
+      fflush(stdout);
 #endif
 
 #if NONBLOCKING
-	    // enable non-blocking sends and receives on this socket
-	    if (!set_socket_nonblocking(clientfd))
-		continue;
+      // enable non-blocking sends and receives on this socket
+      if (!set_socket_nonblocking(clientfd))
+        continue;
 #endif
 
-	    // initialize connection data
-	    ConnectionData connData;
-	    memset(&connData, 0, sizeof(connData));
+      // initialize connection data
+      ConnectionData connData;
+      memset(&connData, 0, sizeof(connData));
 
-	    connData.sock = clientfd;
-	    connData.state = eConnStateReceiving;
+      connData.sock = clientfd;
+      connData.state = eConnStateReceiving;
 
-	    // TODO: add connData in your data structure so that you can
-	    // keep track of that socket.
-	    connections.push_back(connData);
-	}
-
-	// TODO: loop through your open sockets.
-	// For each socket:
-	// 1) Use FD_ISSET to check if the socket is in the readfds or the
-	// writefds set, after the return of select(). 2) If it is in the
-	// readfds set, receive data from that socket, using
-	// process_client_recv(). 3) If it is in the writefds set, write
-	// send to that socket, using process_client_send(). 4) Close and
-	// remove sockets if their connection was terminated.
-	for (size_t i = 0; i < connections.size(); ++i) {
-	    if (FD_ISSET(connections[i].sock, &readfds)) {
-		process_client_recv(connections[i]);
-	    } else if (FD_ISSET(connections[i].sock, &writefds)) {
-		process_client_send(connections[i]);
-	    } else {
-		close(connections[i].sock);
-		connections.erase(std::remove_if(connections.begin(),
-						 connections.end(),
-						 &is_invalid_connection),
-				  connections.end());
-	    }
-	}
+      // TODO: add connData in your data structure so that you can keep track of
+      // that socket.
+      connections.push_back(connData);
     }
 
-    // The program will never reach this part, but for demonstration
-    // purposes, we'll clean up the server resources here and then exit
-    // nicely.
-    close(listenfd);
+    // TODO: loop through your open sockets.
+    // For each socket:
+    // 1) Use FD_ISSET to check if the socket is in the readfds or the writefds
+    // set, after the return of select(). 2) If it is in the readfds set,
+    // receive data from that socket, using process_client_recv(). 3) If it is
+    // in the writefds set, write send to that socket, using
+    // process_client_send(). 4) Close and remove sockets if their connection
+    // was terminated.
+    for (size_t i = 0; i < connections.size(); ++i) {
+      ConnectionData *conn = &connections[i];
+      bool success = true;
+      if (FD_ISSET(conn->sock, &readfds))
+        success = process_client_recv(*conn);
+      else if (FD_ISSET(conn->sock, &writefds))
+        success = process_client_send(*conn);
+      if (!success) {
+		close(conn->sock);
+        conn->sock = -1;
+      }
+    }
+    connections.erase(std::remove_if(connections.begin(), connections.end(),
+                                     &is_invalid_connection),
+                      connections.end());
+  }
 
-    return 0;
+  // The program will never reach this part, but for demonstration purposes,
+  // we'll clean up the server resources here and then exit nicely.
+  close(listenfd);
+
+  return 0;
 }
 
-//--    process_client_recv() ///{{{1///////////////////////////////////////
+//--    process_client_recv()   ///{{{1///////////////////////////////////////
 static bool process_client_recv(ConnectionData &cd) {
-    assert(cd.state == eConnStateReceiving);
+  assert(cd.state == eConnStateReceiving);
 
-    // receive from socket
-    ssize_t ret = recv(cd.sock, cd.buffer, kTransferBufferSize, 0);
+  // receive from socket
+  ssize_t ret = recv(cd.sock, cd.buffer, kTransferBufferSize, 0);
 
-    if (0 == ret) {
+  if (0 == ret) {
 #if VERBOSE
-	printf("  socket %d - orderly shutdown\n", cd.sock);
-	fflush(stdout);
+    printf("  socket %d - orderly shutdown\n", cd.sock);
+    fflush(stdout);
 #endif
 
-	return false;
-    }
+    return false;
+  }
 
-    if (-1 == ret) {
+  if (-1 == ret) {
 #if VERBOSE
-	printf("  socket %d - error on receive: '%s'\n", cd.sock,
-	       strerror(errno));
-	fflush(stdout);
+    printf("  socket %d - error on receive: '%s'\n", cd.sock, strerror(errno));
+    fflush(stdout);
 #endif
 
-	return false;
-    }
+    return false;
+  }
 
-    // update connection buffer
-    cd.bufferSize += ret;
+  // update connection buffer
+  cd.bufferSize += ret;
 
-    // zero-terminate received data
-    cd.buffer[cd.bufferSize] = '\0';
+  // zero-terminate received data
+  cd.buffer[cd.bufferSize] = '\0';
 
-    // transition to sending state
-    cd.bufferOffset = 0;
-    cd.state = eConnStateSending;
-    return true;
+  // transition to sending state
+  cd.bufferOffset = 0;
+  cd.state = eConnStateSending;
+  return true;
 }
 
-//--    process_client_send() ///{{{1///////////////////////////////////////
+//--    process_client_send()   ///{{{1///////////////////////////////////////
 static bool process_client_send(ConnectionData &cd) {
-    assert(cd.state == eConnStateSending);
+  assert(cd.state == eConnStateSending);
 
-    // send as much data as possible from buffer
-    ssize_t ret = send(
-	cd.sock, cd.buffer + cd.bufferOffset, cd.bufferSize - cd.bufferOffset,
-	MSG_NOSIGNAL // suppress SIGPIPE signals, generate EPIPE instead
-    );
+  // send as much data as possible from buffer
+  ssize_t ret = send(
+      cd.sock, cd.buffer + cd.bufferOffset, cd.bufferSize - cd.bufferOffset,
+      MSG_NOSIGNAL // suppress SIGPIPE signals, generate EPIPE instead
+  );
 
-    if (-1 == ret) {
+  if (-1 == ret) {
 #if VERBOSE
-	printf("  socket %d - error on send: '%s'\n", cd.sock, strerror(errno));
-	fflush(stdout);
+    printf("  socket %d - error on send: '%s'\n", cd.sock, strerror(errno));
+    fflush(stdout);
 #endif
 
-	return false;
-    }
+    return false;
+  }
 
-    // update buffer data
-    cd.bufferOffset += ret;
+  // update buffer data
+  cd.bufferOffset += ret;
 
-    // did we finish sending all data
-    if (cd.bufferOffset == cd.bufferSize) {
-	// if so, transition to receiving state again
-	cd.bufferSize = 0;
-	cd.bufferOffset = 0;
-	cd.state = eConnStateReceiving;
-    }
+  // did we finish sending all data
+  if (cd.bufferOffset == cd.bufferSize) {
+    // if so, transition to receiving state again
+    cd.bufferSize = 0;
+    cd.bufferOffset = 0;
+    cd.state = eConnStateReceiving;
+  }
 
-    return true;
+  return true;
 }
 
-//--    setup_server_socket() ///{{{1///////////////////////////////////////
+//--    setup_server_socket()   ///{{{1///////////////////////////////////////
 static int setup_server_socket(short port) {
-    // create new socket file descriptor
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (-1 == fd) {
-	perror("socket() failed");
-	return -1;
-    }
+  // create new socket file descriptor
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (-1 == fd) {
+    perror("socket() failed");
+    return -1;
+  }
 
-    // bind socket to local address
-    sockaddr_in servAddr;
-    memset(&servAddr, 0, sizeof(servAddr));
+  // bind socket to local address
+  sockaddr_in servAddr;
+  memset(&servAddr, 0, sizeof(servAddr));
 
-    servAddr.sin_family = AF_INET;
-    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servAddr.sin_port = htons(port);
+  servAddr.sin_family = AF_INET;
+  servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  servAddr.sin_port = htons(port);
 
-    if (-1 == bind(fd, (const sockaddr *)&servAddr, sizeof(servAddr))) {
-	perror("bind() failed");
-	close(fd);
-	return -1;
-    }
+  if (-1 == bind(fd, (const sockaddr *)&servAddr, sizeof(servAddr))) {
+    perror("bind() failed");
+    close(fd);
+    return -1;
+  }
 
-    // get local address (i.e. the address we ended up being bound to)
-    sockaddr_in actualAddr;
-    socklen_t actualAddrLen = sizeof(actualAddr);
-    memset(&actualAddr, 0, sizeof(actualAddr));
+  // get local address (i.e. the address we ended up being bound to)
+  sockaddr_in actualAddr;
+  socklen_t actualAddrLen = sizeof(actualAddr);
+  memset(&actualAddr, 0, sizeof(actualAddr));
 
-    if (-1 == getsockname(fd, (sockaddr *)&actualAddr, &actualAddrLen)) {
-	perror("getsockname() failed");
-	close(fd);
-	return -1;
-    }
+  if (-1 == getsockname(fd, (sockaddr *)&actualAddr, &actualAddrLen)) {
+    perror("getsockname() failed");
+    close(fd);
+    return -1;
+  }
 
-    char actualBuff[128];
-    printf("Socket is bound to %s %d\n",
-	   inet_ntop(AF_INET, &actualAddr.sin_addr, actualBuff,
-		     sizeof(actualBuff)),
-	   ntohs(actualAddr.sin_port));
+  char actualBuff[128];
+  printf(
+      "Socket is bound to %s %d\n",
+      inet_ntop(AF_INET, &actualAddr.sin_addr, actualBuff, sizeof(actualBuff)),
+      ntohs(actualAddr.sin_port));
 
-    // and start listening for incoming connections
-    if (-1 == listen(fd, kServerBacklog)) {
-	perror("listen() failed");
-	close(fd);
-	return -1;
-    }
+  // and start listening for incoming connections
+  if (-1 == listen(fd, kServerBacklog)) {
+    perror("listen() failed");
+    close(fd);
+    return -1;
+  }
 
-    // allow immediate reuse of the address (ip+port)
-    int one = 1;
-    if (-1 == setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int))) {
-	perror("setsockopt() failed");
-	close(fd);
-	return -1;
-    }
+  // allow immediate reuse of the address (ip+port)
+  int one = 1;
+  if (-1 == setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int))) {
+    perror("setsockopt() failed");
+    close(fd);
+    return -1;
+  }
 
 #if NONBLOCKING
-    // enable non-blocking mode
-    if (!set_socket_nonblocking(fd)) {
-	close(fd);
-	return -1;
-    }
+  // enable non-blocking mode
+  if (!set_socket_nonblocking(fd)) {
+    close(fd);
+    return -1;
+  }
 #endif
 
-    return fd;
+  return fd;
 }
 
-//--    set_socket_nonblocking() ///{{{1////////////////////////////////////
+//--    set_socket_nonblocking()   ///{{{1////////////////////////////////////
 static bool set_socket_nonblocking(int fd) {
-    int oldFlags = fcntl(fd, F_GETFL, 0);
-    if (-1 == oldFlags) {
-	perror("fcntl(F_GETFL) failed");
-	return false;
-    }
+  int oldFlags = fcntl(fd, F_GETFL, 0);
+  if (-1 == oldFlags) {
+    perror("fcntl(F_GETFL) failed");
+    return false;
+  }
 
-    if (-1 == fcntl(fd, F_SETFL, oldFlags | O_NONBLOCK)) {
-	perror("fcntl(F_SETFL) failed");
-	return false;
-    }
+  if (-1 == fcntl(fd, F_SETFL, oldFlags | O_NONBLOCK)) {
+    perror("fcntl(F_SETFL) failed");
+    return false;
+  }
 
-    return true;
+  return true;
 }
 
-//--    is_invalid_connection() ///{{{1////////////////////////////////////
+//--    is_invalid_connection()    ///{{{1////////////////////////////////////
 static bool is_invalid_connection(const ConnectionData &cd) {
-    return cd.sock == -1;
+  return cd.sock == -1;
 }
 
-//--///}}}1////////////////
-// vim:syntax=cpp:foldmethod=marker:ts=4:noexpandtab:
+//--///}}}1//////////////// vim:syntax=cpp:foldmethod=marker:ts=4:noexpandtab:
