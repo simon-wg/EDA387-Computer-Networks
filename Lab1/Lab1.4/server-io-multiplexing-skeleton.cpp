@@ -34,6 +34,8 @@
 //--//////////////////////////////////////////////////////////////////////////
 //--    configurables       ///{{{1///////////////////////////////////////////
 
+#define MAX_EVENTS 8
+
 // Set VERBOSE to 1 to print additional, non-essential information.
 #define VERBOSE 1
 
@@ -147,141 +149,92 @@ int main(int argc, char *argv[]) {
 
   // set up listening socket - see setup_server_socket() for details.
   int listenfd = setup_server_socket(serverPort);
-  int epfd = epoll_create(8);
+  int epfd = epoll_create1(0);
 
   if (-1 == listenfd || -1 == epfd)
     return 1;
 
+  struct epoll_event ev, events[MAX_EVENTS];
+  ev.events = EPOLLIN;
+  ev.data.fd = listenfd;
+  epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
+
   // TODO: declare a data structure that will keep track of one ConnectionData
   // struct for each open connection. E.g. you can use a vector (see Appendix E
   // on the lab manual).
-  std::vector<ConnectionData> connections;
 
   // loop forever
-  while (1) {
-    fd_set readfds, writefds;
+  for (;;) {
+    int nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
 
-    FD_ZERO(&readfds);
-    FD_ZERO(&writefds);
-
-    // TODO: add listenfd to readfds.
-    // NOTE: check for FD_SET() in the man page of select().
-    FD_SET(listenfd, &readfds);
-
-    int maxfd = listenfd;
-
-    // TODO: loop through all open connections (which you have stored in data
-    // structre, e.g. a vector) and add them in readfds or writefds. NOTE: How
-    // to know if a socket should be added in readfds or writefds? Check the
-    // "state" field of ConnectionData for that socket.
-    for (size_t i = 0; i < connections.size(); ++i) {
-      ConnectionData *conn = &connections[i];
-      if (is_invalid_connection(*conn))
-        break;
-      switch (conn->state) {
-      case eConnStateReceiving:
-        FD_SET(conn->sock, &readfds);
-        break;
-      case eConnStateSending:
-        FD_SET(conn->sock, &writefds);
-        break;
-      default:
-        break;
-      }
-      if (conn->sock > maxfd)
-        maxfd = conn->sock;
-    }
-
-    // wait for an event using select()
-    // NOTE 1: we only need one call to select() throughout our program.
-    // NOTE 2: pay attention to the first arguement of select. It should be the
-    // maximum VALUE of all tracked file descriptors + 1.
-    //int ret = select(maxfd + 1, &readfds, &writefds, 0, 0);
-	int MAX_EVENTS = 8;
-	int timeout = 5;
-	epoll_event events[MAX_EVENTS];
-    int event_count = epoll_wait(epfd, events, MAX_EVENTS, -1);	
-	
-    if (-1 == event_count) {
-      perror("select() failed");
+    if (-1 == nfds) {
+      perror("epoll_wait() failed");
       return 1;
     }
 
     // NOTE: if listenfd is in the readfds set after the return of select(),
     // it means we have a new incomming connection, which we need to serve, just
     // as we did in Lab 1.2.
-    if (FD_ISSET(listenfd, &readfds)) {
-      sockaddr_in clientAddr;
-      socklen_t addrSize = sizeof(clientAddr);
-
-      // accept a single incoming connection
-      int clientfd = accept(listenfd, (sockaddr *)&clientAddr, &addrSize);
-
-      if (-1 == clientfd) {
-        perror("accept() failed");
-        continue; // attempt to accept a different client.
-      }
+    for (int i = 0; i < nfds; ++i) {
+      if (events[i].data.fd == listenfd) {
+        sockaddr_in clientAddr;
+        socklen_t addrSize = sizeof(clientAddr);
+        int clientfd = accept(listenfd, (sockaddr *)&clientAddr, &addrSize);
+        if (-1 == clientfd) {
+          perror("accept() failed");
+          continue; // attempt to accept a different client.
+        }
 
 #if VERBOSE
-      // print some information about the new client
-      char buff[128];
-      printf("Connection from %s:%d -> socket %d\n",
-             inet_ntop(AF_INET, &clientAddr.sin_addr, buff, sizeof(buff)),
-             ntohs(clientAddr.sin_port), clientfd);
-      fflush(stdout);
+        // print some information about the new client
+        char buff[128];
+        printf("Connection from %s:%d -> socket %d\n",
+               inet_ntop(AF_INET, &clientAddr.sin_addr, buff, sizeof(buff)),
+               ntohs(clientAddr.sin_port), clientfd);
+        fflush(stdout);
 #endif
 
 #if NONBLOCKING
-      // enable non-blocking sends and receives on this socket
-      if (!set_socket_nonblocking(clientfd))
-        continue;
+        // enable non-blocking sends and receives on this socket
+        if (!set_socket_nonblocking(clientfd))
+          continue;
 #endif
 
-      // initialize connection data
-      ConnectionData connData;
-      memset(&connData, 0, sizeof(connData));
+        // initialize connection data
+        ConnectionData *connData =
+            (ConnectionData *)malloc(sizeof(ConnectionData));
+		if (connData == NULL) {
+		  perror("malloc");
+		  continue;
+		};
 
-      connData.sock = clientfd;
-      connData.state = eConnStateReceiving;
+        connData->sock = clientfd;
+        connData->state = eConnStateReceiving;
 
-      // TODO: add connData in your data structure so that you can keep track of
-      // that socket.
-	  struct epoll_event *event;
-	  epoll_data e_data;
-	  e_data.ptr = &connData;
-	  event->events = EPOLLIN | EPOLLOUT;
-	  event->data = e_data;
-	  epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, event);
-      connections.push_back(connData);
-    }
-
-    // TODO: loop through your open sockets.
-    // For each socket:
-    // 1) Use FD_ISSET to check if the socket is in the readfds or the writefds
-    // set, after the return of select(). 2) If it is in the readfds set,
-    // receive data from that socket, using process_client_recv(). 3) If it is
-    // in the writefds set, write send to that socket, using
-    // process_client_send(). 4) Close and remove sockets if their connection
-    // was terminated.
-    for (size_t i = 0; i < connections.size(); ++i) {
-      ConnectionData *conn = &connections[i];
-      bool success = true;
-      if (FD_ISSET(conn->sock, &readfds))
-        success = process_client_recv(*conn);
-      else if (FD_ISSET(conn->sock, &writefds))
-        success = process_client_send(*conn);
-      if (!success) {
-        close(conn->sock);
-        conn->sock = -1;
+        // TODO: add connData in your data structure so that you can keep track
+        // of that socket.
+        ev.events = EPOLLIN | EPOLLOUT;
+        ev.data.ptr = connData;
+        if (-1 == epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, &ev)) {
+          perror("epoll_ctl: add");
+          exit(EXIT_FAILURE);
+        }
+      } else {
+        bool succ = true;
+		ConnectionData* cd = (ConnectionData*)events[i].data.ptr;
+		if ((events[i].events & EPOLLIN) && cd->state == eConnStateReceiving)
+		  succ = process_client_recv(*cd);
+		if ((events[i].events & EPOLLOUT) && cd->state == eConnStateSending)
+		  succ = process_client_send(*cd);
+		if (!succ){
+		  epoll_ctl(epfd, EPOLL_CTL_DEL, cd->sock, NULL);
+		  close(cd->sock);
+		  free(cd);
+		}
       }
     }
-    connections.erase(std::remove_if(connections.begin(), connections.end(),
-                                     &is_invalid_connection),
-                      connections.end());
   }
 
-  // The program will never reach this part, but for demonstration purposes,
-  // we'll clean up the server resources here and then exit nicely.
   close(listenfd);
 
   return 0;
