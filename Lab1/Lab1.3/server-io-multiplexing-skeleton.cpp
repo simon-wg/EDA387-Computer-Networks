@@ -187,8 +187,8 @@ int main(int argc, char *argv[]) {
       default:
         break;
       }
-	  if (conn->sock > maxfd)
-		maxfd = conn->sock;
+      if (conn->sock > maxfd)
+        maxfd = conn->sock;
     }
 
     // wait for an event using select()
@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
       else if (FD_ISSET(conn->sock, &writefds))
         success = process_client_send(*conn);
       if (!success) {
-		close(conn->sock);
+        close(conn->sock);
         conn->sock = -1;
       }
     }
