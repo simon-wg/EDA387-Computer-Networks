@@ -1,23 +1,38 @@
 I.a.1
-Yes, instant response
+All good
 
 I.a.2
-Simulating 100 clients.
-Establishing 100 connections... 
-  successfully initiated 100 connection attempts!
-Connect timing results for 100 successful connections
-  - min time: 1.403170 ms
-  - max time: 2.887164 ms
-  - average time: 2.279967 ms
- (0 connections failed!)
-Roundtrip timing results for 100 connections for 10000 round trips
-  - min time: 2253.909119 ms
-  - max time: 2897.655171 ms
-  - average time: 2702.681950 ms
-Faster all around, no failures, very fast connect timings.
+New:
+(100)
+- Connect avg: 1.8ms
+- RTT avg: 6.0 ms
+(200)
+- Connect avg: 4.7 ms
+- RTT avg: 9.5 ms
+(300)
+- Connect avg: 3.0 ms
+- RTT avg: 11.8 ms
+(400)
+- Connect avg: 4.8 ms
+- RTT avg: 17.5 ms
+
+Old:
+(100)
+- Connect avg: 1.6 ms
+- RTT avg: 3.5 ms
+(200)
+- Connect avg: 2.2 ms
+- RTT avg: 9.9 ms
+(300)
+- Connect avg: 101.6 ms
+- RTT avg: 21.2 ms
+(400)
+- Connect avg: 139.1 ms
+- RTT avg: 34.0 ms
+
+
+I mean it's just slower...
 
 I.a.3
-Doesn't work to dos using a single connection.
 
 I.a.4
-Yes, if someone opens a lot of long running connections, it can allocate all the file descriptors on the server.

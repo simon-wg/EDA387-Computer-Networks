@@ -203,17 +203,17 @@ int main(int argc, char *argv[]) {
         // initialize connection data
         ConnectionData *connData =
             (ConnectionData *)malloc(sizeof(ConnectionData));
-		if (connData == NULL) {
-		  perror("malloc");
-		  continue;
-		};
+        if (connData == NULL) {
+          perror("malloc");
+          continue;
+        };
 
         connData->sock = clientfd;
         connData->state = eConnStateReceiving;
 
         // TODO: add connData in your data structure so that you can keep track
         // of that socket.
-        ev.events = EPOLLIN | EPOLLOUT;
+        ev.events = EPOLLIN;
         ev.data.ptr = connData;
         if (-1 == epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, &ev)) {
           perror("epoll_ctl: add");
@@ -221,16 +221,28 @@ int main(int argc, char *argv[]) {
         }
       } else {
         bool succ = true;
-		ConnectionData* cd = (ConnectionData*)events[i].data.ptr;
-		if ((events[i].events & EPOLLIN) && cd->state == eConnStateReceiving)
-		  succ = process_client_recv(*cd);
-		if ((events[i].events & EPOLLOUT) && cd->state == eConnStateSending)
-		  succ = process_client_send(*cd);
-		if (!succ){
-		  epoll_ctl(epfd, EPOLL_CTL_DEL, cd->sock, NULL);
-		  close(cd->sock);
-		  free(cd);
-		}
+        ConnectionData *cd = (ConnectionData *)events[i].data.ptr;
+        if ((events[i].events & EPOLLIN) && cd->state == eConnStateReceiving) {
+          succ = process_client_recv(*cd);
+          if (succ && cd->state == eConnStateSending) {
+            ev.data = events[i].data;
+            ev.events = EPOLLOUT;
+            epoll_ctl(epfd, EPOLL_CTL_MOD, cd->sock, &ev);
+          }
+        }
+        if ((events[i].events & EPOLLOUT) && cd->state == eConnStateSending) {
+          succ = process_client_send(*cd);
+          if (succ && cd->state == eConnStateReceiving) {
+            ev.data = events[i].data;
+            ev.events = EPOLLIN;
+            epoll_ctl(epfd, EPOLL_CTL_MOD, cd->sock, &ev);
+          }
+        }
+        if (!succ) {
+          epoll_ctl(epfd, EPOLL_CTL_DEL, cd->sock, NULL);
+          close(cd->sock);
+          free(cd);
+        }
       }
     }
   }
