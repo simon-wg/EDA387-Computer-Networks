@@ -196,9 +196,13 @@ int main(int argc, char *argv[]) {
     // NOTE 1: we only need one call to select() throughout our program.
     // NOTE 2: pay attention to the first arguement of select. It should be the
     // maximum VALUE of all tracked file descriptors + 1.
-    int ret = select(maxfd + 1, &readfds, &writefds, 0, 0);
-
-    if (-1 == ret) {
+    //int ret = select(maxfd + 1, &readfds, &writefds, 0, 0);
+	int MAX_EVENTS = 8;
+	int timeout = 5;
+	epoll_event events[MAX_EVENTS];
+    int event_count = epoll_wait(epfd, events, MAX_EVENTS, -1);	
+	
+    if (-1 == event_count) {
       perror("select() failed");
       return 1;
     }
@@ -243,7 +247,10 @@ int main(int argc, char *argv[]) {
       // TODO: add connData in your data structure so that you can keep track of
       // that socket.
 	  struct epoll_event *event;
-	  event->events = EPOLLIN;
+	  epoll_data e_data;
+	  e_data.ptr = &connData;
+	  event->events = EPOLLIN | EPOLLOUT;
+	  event->data = e_data;
 	  epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, event);
       connections.push_back(connData);
     }
