@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/select.h>
 #include <unistd.h>
 
@@ -146,8 +147,9 @@ int main(int argc, char *argv[]) {
 
   // set up listening socket - see setup_server_socket() for details.
   int listenfd = setup_server_socket(serverPort);
+  int epfd = epoll_create(8);
 
-  if (-1 == listenfd)
+  if (-1 == listenfd || -1 == epfd)
     return 1;
 
   // TODO: declare a data structure that will keep track of one ConnectionData
@@ -157,7 +159,6 @@ int main(int argc, char *argv[]) {
 
   // loop forever
   while (1) {
-
     fd_set readfds, writefds;
 
     FD_ZERO(&readfds);
@@ -241,6 +242,9 @@ int main(int argc, char *argv[]) {
 
       // TODO: add connData in your data structure so that you can keep track of
       // that socket.
+	  struct epoll_event *event;
+	  event->events = EPOLLIN;
+	  epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, event);
       connections.push_back(connData);
     }
 
