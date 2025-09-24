@@ -1,0 +1,11 @@
+Question1:
+    In a conventional network, a switch knows this because it has a MAC to port table.
+
+Question2:
+    The switch has no rule for forwarding between h1 and h2 so the packet is sent to the controller, which adds a rule to the switch on how to forward called a flow. Which conains rules for how to match on the packet header and an action for the switch to perform and statistics for the flow.
+
+Question 3:
+    TODO
+
+Question 4:
+    
