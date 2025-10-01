@@ -8,4 +8,40 @@ Question 3:
     TODO
 
 Question 4:
-    
+    Setup:
+    Client port - 41496
+    Controller port - 6653
+    OFPT_HELLO: The first packet to be sent from the controller to the client. Establishing the connection.
+    OFPT_PORT_STATUS: Switch notifies controller that physical ports has changed
+    OFPT_FEATURES_REQUEST: The controller requests the switch's capabilities.
+    OFPT_FEATURES_REPLY: The switch replies with it's capabilities.
+    OPFT_MULTIPART_REQUEST/REPLY: OFPMP_PORT_DESC: request and reply of the switch's port structure.
+    OFPT_GET_CONFIG_REQUEST/REPLY: The controller requests the current switch configuration. The switch replies with nothing since it's not configured yet.
+    OFPMP_DESC: The controller requests the general information about the switch.
+    OFPMP_TABLE_FEATURES: Controller requests the switches current table since the request-body is empty. Has many responses
+    OFPT_ROLE_REQUEST: The controller requests to become the switch's master. The switch replies with the same role to acknowledge.
+    OFPT_FLOW_MOD: The controller deletes all current flows in the switch. 
+    OFPT_GROUP_MOD: The controller deletes all current flows in the switch.
+    OFPT_FLOW_MOD: The controller requests that all packets to the switch be sent to the controller to make new rules.
+
+    h1 ping h2:
+    OFPT_PACKET_IN: The switch forwards an ARP request from H1 about the MAC address of H2.
+    OFT_PACKET_OUT: The controller floods the switch with a request about the MAC address who has the IP address of H2.
+    The controller establishes a route for ARP requests between h1 and h2.
+    OFPT_PACKET_IN: The ARP request is resent and handled as usual by the switch because it has a flow for how to handle that request type.
+    OFPT_PACKET_IN: h1 sends an ICMP packet to h2, and a flow mod (OFPT_FLOW_MOD) is done by the controller to let the switch match ipv4 packets from h1 to h2.
+    OFPT_PACKET_IN: H2 responds to the ping and the controller does a flow_mod to let the switch handle ipv4 commnication from h2 to h1.
+    Then it's just echo requests and echo replies that we don't see because the switch is configured.
+
+Question 5: Explain each flow and what it's fields describe.
+    We have one flow for communication IPv4 requests from h1 to h2 and one from h2 to h1. They have fields for statistics about how much data has been transferred between them, timeout, duration etc.
+    There is also the original flow, piping all unmatched communcation to the controller so that it can set up new flows.
+
+Question 6:
+    Since the switch matches all ip-packets from and to h1, it shouldn't need to establish any new flows. 
+
+Question 7:
+    7 switches are present. 5 switches needs to be programmed in order to ping from h1 to h8.
+
+Question 8:
+    It increases 
