@@ -70,6 +70,8 @@
               # Libraries your project uses
               readline
               termcap
+
+              uv
             ];
 
             # Set up environment variables
